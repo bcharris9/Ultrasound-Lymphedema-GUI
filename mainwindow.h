@@ -36,6 +36,10 @@ private slots:
 
     void on_btnOpenPort_clicked();
 
+    void readData();
+
+    void on_btnZero_clicked();
+
 private:
     Ui::MainWindow *ui;
 
@@ -43,6 +47,11 @@ private:
 
     QSerialPort *_serialPort;
 
+    int zeroTopLeft=0;
+    int zeroTopRight=0;
+    int zeroBotLeft=0;
+
+    QStringList items;
 };
 
 
