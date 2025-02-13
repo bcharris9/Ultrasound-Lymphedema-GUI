@@ -30,28 +30,36 @@ public:
 private slots:
 
     void on_btnStart_clicked();
-    void on_btnStop_clicked();
 
-    void on_PortInfo_clicked();
+    void on_btnStop_clicked();
 
     void on_btnOpenPort_clicked();
 
+    void on_btnZero_clicked();
+
+    void on_btnRefreshPorts_clicked();
+
     void readData();
 
-    void on_btnZero_clicked();
+    void on_btnClosPort_clicked();
 
 private:
     Ui::MainWindow *ui;
 
-    void loadPorts();
-
     QSerialPort *_serialPort;
 
-    int zeroTopLeft=0;
-    int zeroTopRight=0;
-    int zeroBotLeft=0;
-
     QStringList items;
+
+    int zeroTopLeft=0, zeroTopRight=0, zeroBotLeft=0;
+
+    int topLeftAvg = 0, topRightAvg = 0, botLeftAvg = 0;
+
+    //sampling rate
+    const int sampleAverage = 500;
+
+    int samples = 0;
+
+    void resetValues();
 };
 
 
