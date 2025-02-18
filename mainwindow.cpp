@@ -159,7 +159,6 @@ void MainWindow::on_btnRefreshPorts_clicked() {
     }
 }
 
-
 void MainWindow::on_btnClosPort_clicked() {
     if (_serialPort != nullptr) {
         _serialPort->close();
