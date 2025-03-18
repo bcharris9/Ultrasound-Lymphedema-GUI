@@ -26,9 +26,6 @@
     <layout class="QVBoxLayout" name="verticalLayout">
      <item>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="1" column="0">
-        <widget class="QSpinBox" name="framesPerSecond"/>
-       </item>
        <item row="5" column="0">
         <layout class="QGridLayout" name="gridLayout_2">
          <item row="2" column="0">
@@ -114,6 +111,9 @@
           <string>ZERO</string>
          </property>
         </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QDoubleSpinBox" name="framesPerSecond"/>
        </item>
       </layout>
      </item>

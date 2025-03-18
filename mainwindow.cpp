@@ -1,22 +1,29 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 
+
+#include <QMessageBox>
 #include <QThread>
 #include <QKeyEvent>
 #include <QSerialPortInfo>
 #include <QMessageBox>
 #include <QApplication>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , _serialPort(nullptr)
-    , ui(new Ui::MainWindow)
+    , ui(new Ui::MainWindow),
+    csvWriter(new CsvWriter(this))
 {
     //sets up GUI
     ui->setupUi(this);
 
     ui->framesPerSecond->installEventFilter(this);
     ui->captureLengthSeconds->installEventFilter(this);
+
+
+    connect(csvWriter, &CsvWriter::requestData, this, &MainWindow::sendSensorData);
 
     //TODO: CHANGE THESE VALUES TO CORRECT
 
@@ -33,25 +40,38 @@ MainWindow::MainWindow(QWidget *parent)
 
 //deletes the window and disconnects the serial port
 MainWindow::~MainWindow() {
-    delete ui;
+    if (csvWriter->isRunning()) {
+        csvWriter->stop();
+        csvWriter->wait();  // Ensure thread stops before deletion
+    }
     if (_serialPort != nullptr) {
         _serialPort->close();
         delete _serialPort;
     }
+    delete csvWriter;
+    delete ui;
 }
 
 //initialize counters
-int framesPerSecond, seconds;
+double framesPerSecond;
+int seconds;
 
 //function happens when START button in the GUI is clicked
 void MainWindow::on_btnStart_clicked(){
+
     //gets values from the GUI
-    framesPerSecond = ui->framesPerSecond->text().toInt();
+    framesPerSecond = ui->framesPerSecond->text().toDouble();
     seconds = ui->captureLengthSeconds->text().toInt();
 
     //does not continue if invalid arguments are given
     if (seconds <= 0 || framesPerSecond <= 0) {
+        QMessageBox::warning(this, "Invalid Input", "Frames per second and capture length must be greater than zero.");
         return;
+    }
+
+    if (!csvWriter->isRunning()) {
+        csvWriter->setParameters(framesPerSecond, seconds); // Ensure CsvWriter can use these values
+        csvWriter->start();
     }
 
     //connects to progress bar
@@ -61,12 +81,23 @@ void MainWindow::on_btnStart_clicked(){
     progressBar->setRange(0, seconds);
     progressBar->setValue(0);
 
-    //loop that will send the signals and increment bar
-    for (int i = 0; i <= seconds; ++i) {
-        // Do some work here
-        progressBar->setValue(i); //update the progress bar
-        QApplication::processEvents(); //allows process to update
-    }
+
+    QTimer *timer = new QTimer(this);
+    int elapsed = 0;
+
+
+    connect(timer, &QTimer::timeout, this, [=]() mutable {
+        if (elapsed >= seconds) {
+            timer->stop();
+            timer->deleteLater();
+        }
+        else {
+            elapsed++;
+            ui->progressBar->setValue(elapsed);
+        }
+    });
+
+    timer->start(1); // Update every second
 }
 
 void MainWindow::freezeCapture() {
@@ -121,7 +152,7 @@ void MainWindow::readData() {
     // Append incoming data to buffer
     static QByteArray buffer;
     buffer.append(_serialPort->readAll());
-    qDebug() << "Received Raw Data: " << buffer;
+    //qDebug() << "Received Raw Data: " << buffer;
 
     // Process the data once we have enough samples
     //if (samples < sampleAverage) {
@@ -130,8 +161,8 @@ void MainWindow::readData() {
 
         // Split data by commas to separate the values
         QStringList items = data.split(",");
-        qDebug() << "Parsed Data: " << data;
-        qDebug() << "Number of items: " << items.size();
+        //qDebug() << "Parsed Data: " << data;
+        //qDebug() << "Number of items: " << items.size();
 
         // Ensure there are at least 3 values (one for each sensor)
         if (items.size() == 3) {
@@ -143,7 +174,7 @@ void MainWindow::readData() {
 
         }
         else {
-            qDebug() << "Insufficient data. Expected 3 values, received: " << items.size();
+            //qDebug() << "Insufficient data. Expected 3 values, received: " << items.size();
         }
 
         // Clear the buffer after processing the data
@@ -153,60 +184,6 @@ void MainWindow::readData() {
     // Once we have enough samples, update the UI with averages
 
 }
-
-//read data from the microcontroller and display it as output
-/*void MainWindow::readData() {
-    //returns error if port is disconnected
-    if (!_serialPort->isOpen()) {
-        QMessageBox::critical(this, "Port Error", "Port is not open");
-        return;
-    }
-
-    //appends all data sent from the microcontroller to the buffer
-    static QByteArray buffer;
-    buffer.append(_serialPort->readAll());
-    qDebug() << "Received Raw Data: " << buffer;
-
-    //creates the average based on sampleAverage set in mainwindow.h
-    if (samples < sampleAverage) {
-        //if (buffer.contains("")) {
-            //convert & trim
-            QString data = QString::fromUtf8(buffer).trimmed();
-            //int endIndex = buffer.indexOf("\r\n");
-            //QString data = QString::fromUtf8(buffer.left(endIndex)).trimmed(); // Extract a full line
-            //buffer.remove(0, endIndex + 2); // Remove processed data from buffer
-            qDebug() << "Parsed Data: " << data; // Debug parsed values
-
-            items = data.split(",");
-            qDebug() << items[0];
-            qDebug() << items[1];
-            qDebug() << items[2];
-
-            qDebug() << items.size();
-            //ensure there are at least 3 values
-            if (items.size() >= 3) {
-                botLeftAvg += items[0].toInt();
-                topLeftAvg += items[1].toInt();
-                topRightAvg += items[2].toInt();
-            }
-
-            //clear the buffer for the next message
-            buffer.clear();
-            samples++;
-        //}
-    }
-
-    //set the UI to display the average and reset them back to the start
-    else {
-        ui->botLeftNum->display(botLeftAvg/sampleAverage-zeroBotLeft);
-        ui->topLeftNum->display(topLeftAvg/sampleAverage-zeroTopLeft);
-        ui->topRightNum->display(topRightAvg/sampleAverage-zeroTopRight);
-        botLeftAvg = 0;
-        topLeftAvg = 0;
-        topRightAvg = 0;
-        samples = 0;
-    }
-}*/
 
 //sets the zeros
 void MainWindow::on_btnZero_clicked() {
@@ -303,6 +280,12 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     }
     // Otherwise, let the default behavior happen
     return QMainWindow::eventFilter(obj, event);
+}
+
+void MainWindow::sendSensorData() {
+    csvWriter->botLeftAvg = ui->botLeftNum->intValue();
+    csvWriter->topLeftAvg = ui->topLeftNum->intValue();
+    csvWriter->topRightAvg = ui->topRightNum->intValue();
 }
 
 

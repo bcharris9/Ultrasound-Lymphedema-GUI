@@ -30,6 +30,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(Ultrasound_GUI
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        csvwriter.h csvwriter.cpp
+
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET Ultrasound_GUI APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR

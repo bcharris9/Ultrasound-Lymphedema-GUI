@@ -1,6 +1,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "csvwriter.h"
+
 #include <QMainWindow>
 #include <QSerialPort>
 #include <QSerialPortInfo>
@@ -30,6 +32,10 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+public slots:
+    void sendSensorData();
+
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -80,7 +86,11 @@ private:
     QVector<int> keys;
 
     int Buffer;
+
+    CsvWriter *csvWriter;
+
 };
+
 
 
 #endif // MAINWINDOW_H
