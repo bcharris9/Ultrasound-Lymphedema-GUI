@@ -12,6 +12,9 @@
 
 #include <QMessageBox>
 
+#include <QKeyEvent>
+
+#include <QVector>
 
 
 QT_BEGIN_NAMESPACE
@@ -27,11 +30,19 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
+
 private slots:
 
     void on_btnStart_clicked();
 
     void on_btnStop_clicked();
+
+    void freezeCapture();
 
     void on_btnOpenPort_clicked();
 
@@ -42,6 +53,11 @@ private slots:
     void readData();
 
     void on_btnClosPort_clicked();
+
+    //void keyPressEvent(QKeyEvent *event);
+    //void keyReleaseEvent(QKeyEvent *event);
+
+    //void on_framesPerSecond_valueChanged(int arg1);
 
 private:
     Ui::MainWindow *ui;
@@ -60,6 +76,10 @@ private:
     int samples = 0;
 
     void resetValues();
+
+    QVector<int> keys;
+
+    int Buffer;
 };
 
 

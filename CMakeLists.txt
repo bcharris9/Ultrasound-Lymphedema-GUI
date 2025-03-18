@@ -59,7 +59,7 @@ target_link_libraries(Ultrasound_GUI PRIVATE Qt6::SerialPort)
 
 #target_link_libraries(Ultrasound_GUI PRIVATE Qt6::Core Qt6::Gui Qt6::Bluetooth)
 
-
+set(CUSTOM_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos/Info.plist")
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
@@ -69,6 +69,8 @@ if(${QT_VERSION} VERSION_LESS 6.1.0)
 endif()
 set_target_properties(Ultrasound_GUI PROPERTIES
     ${BUNDLE_ID_OPTION}
+    MACOSX_BUNDLE_ICON_FILE "sketch.icns"  # still required for icon
+    MACOSX_BUNDLE_INFO_PLIST ${CUSTOM_PLIST}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE

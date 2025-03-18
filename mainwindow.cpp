@@ -1,6 +1,12 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 
+#include <QThread>
+#include <QKeyEvent>
+#include <QSerialPortInfo>
+#include <QMessageBox>
+#include <QApplication>
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , _serialPort(nullptr)
@@ -9,18 +15,20 @@ MainWindow::MainWindow(QWidget *parent)
     //sets up GUI
     ui->setupUi(this);
 
+    ui->framesPerSecond->installEventFilter(this);
+    ui->captureLengthSeconds->installEventFilter(this);
+
     //TODO: CHANGE THESE VALUES TO CORRECT
 
     //sets minimum and maximum for the amount of frames per second
-    ui->framesPerSecond->setMaximum(1000000000);
-    ui->framesPerSecond->setMinimum(0);
+    ui->framesPerSecond->setRange(0, 1000000000);
 
     //sets minimum and maximum for the amount time to run
-    ui->captureLengthSeconds->setMaximum(1000000000);
-    ui->captureLengthSeconds->setMinimum(0);
+    ui->captureLengthSeconds->setRange(0, 1000000000);
 
     //calls function to load the ports into the drop down menu
     on_btnRefreshPorts_clicked();
+
 }
 
 //deletes the window and disconnects the serial port
@@ -42,7 +50,7 @@ void MainWindow::on_btnStart_clicked(){
     seconds = ui->captureLengthSeconds->text().toInt();
 
     //does not continue if invalid arguments are given
-    if (seconds == 0 || framesPerSecond == 0) {
+    if (seconds <= 0 || framesPerSecond <= 0) {
         return;
     }
 
@@ -59,6 +67,10 @@ void MainWindow::on_btnStart_clicked(){
         progressBar->setValue(i); //update the progress bar
         QApplication::processEvents(); //allows process to update
     }
+}
+
+void MainWindow::freezeCapture() {
+    //TODO: IMPLEMENT
 }
 
 //function happens when the stop button is pressed to halt the capture
@@ -99,9 +111,51 @@ void MainWindow::on_btnOpenPort_clicked() {
         QMessageBox::critical(this, "Port Error", "Unable to open specified Port...");
     }
 }
+void MainWindow::readData() {
+    // Check if the serial port is open
+    if (!_serialPort->isOpen()) {
+        QMessageBox::critical(this, "Port Error", "Port is not open");
+        return;
+    }
+
+    // Append incoming data to buffer
+    static QByteArray buffer;
+    buffer.append(_serialPort->readAll());
+    qDebug() << "Received Raw Data: " << buffer;
+
+    // Process the data once we have enough samples
+    //if (samples < sampleAverage) {
+        // Convert QByteArray to QString and trim any unwanted spaces
+        QString data = QString::fromUtf8(buffer).trimmed();
+
+        // Split data by commas to separate the values
+        QStringList items = data.split(",");
+        qDebug() << "Parsed Data: " << data;
+        qDebug() << "Number of items: " << items.size();
+
+        // Ensure there are at least 3 values (one for each sensor)
+        if (items.size() == 3) {
+            bool ok0, ok1, ok2;
+            // Convert the values to integers, check if conversion is successful
+            ui->botLeftNum->display(items[0].toInt(&ok0) - zeroBotLeft);
+            ui->topLeftNum->display(items[1].toInt(&ok0) - zeroTopLeft);
+            ui->topRightNum->display(items[2].toInt(&ok0) - zeroTopRight);
+
+        }
+        else {
+            qDebug() << "Insufficient data. Expected 3 values, received: " << items.size();
+        }
+
+        // Clear the buffer after processing the data
+        buffer.clear();
+    //}
+
+    // Once we have enough samples, update the UI with averages
+
+}
 
 //read data from the microcontroller and display it as output
-void MainWindow::readData() {
+/*void MainWindow::readData() {
     //returns error if port is disconnected
     if (!_serialPort->isOpen()) {
         QMessageBox::critical(this, "Port Error", "Port is not open");
@@ -111,14 +165,24 @@ void MainWindow::readData() {
     //appends all data sent from the microcontroller to the buffer
     static QByteArray buffer;
     buffer.append(_serialPort->readAll());
+    qDebug() << "Received Raw Data: " << buffer;
 
     //creates the average based on sampleAverage set in mainwindow.h
     if (samples < sampleAverage) {
-        if (buffer.contains("\n")) {
+        //if (buffer.contains("")) {
             //convert & trim
             QString data = QString::fromUtf8(buffer).trimmed();
-            items = data.split(",");
+            //int endIndex = buffer.indexOf("\r\n");
+            //QString data = QString::fromUtf8(buffer.left(endIndex)).trimmed(); // Extract a full line
+            //buffer.remove(0, endIndex + 2); // Remove processed data from buffer
+            qDebug() << "Parsed Data: " << data; // Debug parsed values
 
+            items = data.split(",");
+            qDebug() << items[0];
+            qDebug() << items[1];
+            qDebug() << items[2];
+
+            qDebug() << items.size();
             //ensure there are at least 3 values
             if (items.size() >= 3) {
                 botLeftAvg += items[0].toInt();
@@ -129,7 +193,7 @@ void MainWindow::readData() {
             //clear the buffer for the next message
             buffer.clear();
             samples++;
-        }
+        //}
     }
 
     //set the UI to display the average and reset them back to the start
@@ -142,7 +206,7 @@ void MainWindow::readData() {
         topRightAvg = 0;
         samples = 0;
     }
-}
+}*/
 
 //sets the zeros
 void MainWindow::on_btnZero_clicked() {
@@ -185,4 +249,61 @@ void MainWindow::resetValues() {
     ui->topLeftNum->display(0);
     ui->topRightNum->display(0);
 }
+
+void MainWindow::keyPressEvent(QKeyEvent *event)
+{
+
+    if (event->isAutoRepeat()) {
+        return;
+    }
+
+    else if (!event->isAutoRepeat()) {
+        keys.clear();
+        keys.append(event->key());
+    }
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent *event) {
+    if (event->isAutoRepeat()) {
+        return;
+    }
+
+    keys.append(event->key());
+    if (keys.size() == 3) {
+        if (keys[0] == 16777250 && keys[1] == 16777250) {
+            if (keys[2] == 56) {
+                on_btnStart_clicked();
+            }
+
+            else if (keys[2] == 57) {
+                freezeCapture();
+            }
+
+            else if (keys[2] == 48) {
+                on_btnStop_clicked();
+            }
+
+        }
+        keys.clear();
+    }
+}
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+    if ((obj == ui->framesPerSecond || obj == ui->captureLengthSeconds) && event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        // Debug output to see what actually arrives:
+        //qDebug() << "KeyPress:" << keyEvent->key() << "modifiers:" << keyEvent->modifiers();
+
+        // Check if it's Ctrl+8
+        if ((keyEvent->key() == Qt::Key_8 | keyEvent->key() == Qt::Key_9 | keyEvent->key() == Qt::Key_0) &&
+            (keyEvent->modifiers() & (Qt::ControlModifier | Qt::MetaModifier))) {
+            // Ignore pedal input
+            return true;
+        }
+    }
+    // Otherwise, let the default behavior happen
+    return QMainWindow::eventFilter(obj, event);
+}
+
+
 
